@@ -1,0 +1,24 @@
+---
+- name: Collect installed packages on SUSE VMs
+  hosts: all
+  become: yes
+  tasks:
+    - name: Gather installed packages and versions
+      shell: "rpm -qa --queryformat '%{NAME} %{VERSION}-%{RELEASE}\\n'"
+      register: installed_packages
+
+    - name: Save installed packages with the real hostname
+      delegate_to: localhost
+      local_action:
+        module: copy
+        content: |
+          {
+            "{{ ansible_hostname }}": {{ installed_packages.stdout_lines | to_json }}
+          }
+        dest: "./temp_{{ inventory_hostname }}_packages.json"
+
+- name: Combine all results into one JSON
+  hosts: localhost
+  tasks:
+    - name: Merge all package files into one JSON
+      shell: cat ./temp_*_packages.json | jq -s 'add' > all_vm_packages.json
